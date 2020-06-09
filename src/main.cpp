@@ -151,6 +151,16 @@ const char index_html[] PROGMEM = R"rawliteral(
             Scan Wifi
         </button> 
     </a> 
+  <a href='/sleepMax'> 
+      <button class="scanWifi"> 
+          Sensor Sleep
+      </button> 
+  </a> 
+  <a href='/wakeUpMax'> 
+        <button class="scanWifi"> 
+            Wake Up Sensor
+        </button> 
+    </a> 
   <p>
     <i class="fas fa-thermometer-half" style="color:#059e8a;"></i> 
     <span class="dht-labels">Temperature</span> 
@@ -567,6 +577,16 @@ void setup()
   //SpO2
   server.on("/spo2", HTTP_GET, [] {
     server.send(200, "text/plain", String(spo2).c_str());
+  });
+
+  // Sleep and Wake Up Max30102
+  server.on("/sleepMax", HTTP_GET, [] {
+    particleSensor.shutDown();
+    Serial.println("Tat sensor");
+  });
+  server.on("/wakeUpMax", HTTP_GET, [] {
+    particleSensor.wakeUp();
+    Serial.println("Bat sensor");
   });
 
   // Start server
