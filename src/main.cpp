@@ -70,25 +70,6 @@ String months[12] = {"January", "February", "March", "April", "May", "June", "Ju
 String HMS;
 String currentDate;
 
-// Replace with your network credentials
-const char *ssid = "MY ASUS";
-const char *password = "quang758";
-const char *ssid2 = "WiFi";
-const char *password2 = "chucmungnammoi";
-
-#define DHTPIN D3 // Digital pin connected to the DHT sensor
-
-// Uncomment the type of sensor in use:
-//#define DHTTYPE    DHT11     // DHT 11
-#define DHTTYPE DHT11 // DHT 22 (AM2302)
-//#define DHTTYPE    DHT21     // DHT 21 (AM2301)
-
-DHT dht(DHTPIN, DHTTYPE);
-
-// current temperature & humidity, updated in loop()
-float t = 0.0;
-float h = 0.0;
-
 // Create AsyncWebServer object on port 80
 ESP8266WebServer server(80);
 
@@ -344,15 +325,6 @@ setInterval(function ( ) {
 // Replaces placeholder with DHT values
 String processor(const String &var)
 {
-  //Serial.println(var);
-  if (var == "TEMPERATURE")
-  {
-    return String(t);
-  }
-  else if (var == "HUMIDITY")
-  {
-    return String(h);
-  }
   if (var == "HMS")
   {
     return String(HMS);
@@ -467,36 +439,6 @@ void setup()
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("dang quang", "19216812");
 
-  // Connect to Wi-Fi
-  // scan....
-  // int n = WiFi.scanNetworks();
-  // for (int i = 0; i < n; ++i)
-  // {
-  //   if (WiFi.SSID(i) == ssid)
-  //   {
-  //     WiFi.begin(ssid, password); //trying to connect the modem
-  //     break;
-  //   }
-  //   if (WiFi.SSID(i) == ssid2)
-  //   {
-  //     WiFi.begin(ssid2, password2); //trying to connect the modem
-  //     break;
-  //   }
-  // }
-  // Serial.println("Connecting to WiFi");
-  // while (WiFi.status() != WL_CONNECTED)
-  // {
-  //   delay(1000);
-  //   Serial.println(".");
-  //   demWifiConnect++;
-  //   if (demWifiConnect == 10)
-  //   {
-  //     demWifiConnect = 0;
-  //     coWiFi = false;
-  //     break;
-  //   }
-  // }
-
   // todo do wifi
   String id = "";
   String pass = "";
@@ -543,23 +485,12 @@ void setup()
   Serial.print(", IP: ");
   Serial.println(WiFi.localIP());
 
-  //Khai bao dht
-  dht.begin();
-
   // Route for root / web page
   // server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
   //   request->send_P(200, "text/html", index_html, processor);
   // });
   // server.on("/", HTTP_GET, [] { server.send(200, "text/html", String(processor).c_str()); });
   server.on("/", HTTP_GET, [] { server.send(200, "text/html", index_html); });
-
-  // DHT !!
-  server.on("/temperature", HTTP_GET, [] {
-    server.send(200, "text/plain", String(t).c_str());
-  });
-  server.on("/humidity", HTTP_GET, [] {
-    server.send(200, "text/plain", String(h).c_str());
-  });
 
   //Gio phut giay
   server.on("/hms", HTTP_GET, [] {
@@ -579,15 +510,15 @@ void setup()
     server.send(200, "text/plain", String(spo2).c_str());
   });
 
-  // Sleep and Wake Up Max30102
-  server.on("/sleepMax", HTTP_GET, [] {
-    particleSensor.shutDown();
-    Serial.println("Tat sensor");
-  });
-  server.on("/wakeUpMax", HTTP_GET, [] {
-    particleSensor.wakeUp();
-    Serial.println("Bat sensor");
-  });
+  // todo Sleep and Wake Up Max30102
+  // server.on("/sleepMax", HTTP_GET, [] {
+  //   particleSensor.shutDown();
+  //   Serial.println("Tat sensor");
+  // });
+  // server.on("/wakeUpMax", HTTP_GET, [] {
+  //   particleSensor.wakeUp();
+  //   Serial.println("Bat sensor");
+  // });
 
   // Start server
   server.begin();
@@ -635,30 +566,8 @@ void loop()
                       // if (coWiFi == true)
                       // {
   timeClient.update();
-  if (currentMillis - previousMillisDHT >= intervalDHT)
-  {
-    // save the last time you updated the DHT values
-    previousMillisDHT = currentMillis;
-    // Read temperature as Celsius (the default)
-    float newT = dht.readTemperature();
-    // Read temperature as Fahrenheit (isFahrenheit = true)
-    //float newT = dht.readTemperature(true);
-    float newH = dht.readHumidity();
-    // if humidity read failed, don't change h value
-    // if temperature read failed, don't change t value
-    if (isnan(newT) && isnan(newH))
-    {
-      Serial.println("Failed to read from DHT sensor!");
-    }
-    else
-    {
-      t = newT;
-      Serial.println(t);
-      h = newH;
-      Serial.println(h);
-    }
-  }
 
+  // Cap nhap thoi gian
   if (currentMillis - previousMillisRTC >= intervalRTC)
   {
     previousMillisRTC = currentMillis;
@@ -667,8 +576,7 @@ void loop()
 
     // Get a time structure
     unsigned long epochTime = timeClient.getEpochTime();
-    // unsigned long Sunrise = 1587359455;
-    // struct tm *sr = gmtime((time_t *)&Sunrise);
+
     struct tm *ptm = gmtime((time_t *)&epochTime);
 
     int monthDay = ptm->tm_mday;
@@ -688,7 +596,6 @@ void loop()
 
     Serial.println("");
   }
-  // }
 
   if (j < 100)
   {
@@ -716,7 +623,7 @@ void loop()
 
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
   // while (1)
-  if (j >= 100)
+  else if (j >= 100)
   {
     //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
     // for (byte i = 25; i < 100; i++)
@@ -729,7 +636,7 @@ void loop()
 
     //take 25 sets of samples before calculating the heart rate.
     // for (byte i = 75; i < 100; i++)
-    if (k < 125)
+    else if (k < 125)
     {
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check();                   //Check the sensor for new data
@@ -741,22 +648,22 @@ void loop()
       particleSensor.nextSample(); //We're finished with this sample so move to next sample
 
       //send samples and calculation result to terminal program through UART
-      Serial.print(F("red="));
-      Serial.print(redBuffer[i], DEC);
-      Serial.print(F(", ir="));
-      Serial.print(irBuffer[i], DEC);
+      // Serial.print(F("red="));
+      // Serial.print(redBuffer[i], DEC);
+      // Serial.print(F(", ir="));
+      // Serial.print(irBuffer[i], DEC);
 
-      Serial.print(F(", HR="));
-      Serial.print(heartRate, DEC);
+      // Serial.print(F(", HR="));
+      // Serial.print(heartRate, DEC);
 
-      Serial.print(F(", HRvalid="));
-      Serial.print(validHeartRate, DEC);
+      // Serial.print(F(", HRvalid="));
+      // Serial.print(validHeartRate, DEC);
 
-      Serial.print(F(", SPO2="));
-      Serial.print(spo2, DEC);
+      // Serial.print(F(", SPO2="));
+      // Serial.print(spo2, DEC);
 
-      Serial.print(F(", SPO2Valid="));
-      Serial.println(validSPO2, DEC);
+      // Serial.print(F(", SPO2Valid="));
+      // Serial.println(validSPO2, DEC);
     }
 
     //After gathering 25 new samples recalculate HR and SP02
@@ -765,7 +672,7 @@ void loop()
     j++;
   }
 
-  if (j >= 200)
+  else if (j >= 200)
   {
     j = 100;
     k = 25;
