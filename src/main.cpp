@@ -14,7 +14,7 @@
 
 //Cam bien DHT11
 #include <Adafruit_Sensor.h>
-#include <DHT.h>
+// #include <DHT.h>
 #include "Wire.h"
 #include "SPI.h"
 
@@ -55,6 +55,7 @@ unsigned long previousTimeUp = 0;
 unsigned long interval = 10000;
 unsigned int dem = 0;
 unsigned int demWifiConnect = 0;
+int mode = 0;
 bool coWiFi = true;
 
 // Oled 1.3"
@@ -75,13 +76,15 @@ ESP8266WebServer server(80);
 
 // Generally, you should use "unsigned long" for variables that hold time
 // The value will quickly become too large for an int to store
-unsigned long previousMillisDHT = 0; // will store last time DHT was updated
-unsigned long previousMillisRTC = 0; // will store last time DHT was updated
 
-// Updates DHT readings every 10 seconds
-const long intervalDHT = 10000;
+unsigned long previousMillisRTC = 0; // will store last time RTC was updated
+
+// Updates RTC readings every 1 seconds
 const long intervalRTC = 1000;
 uint32_t wifiIP;
+
+// Time get data from MAX30102
+const long intervalMAX = 500;
 
 //Oled section
 SH1106 display(0x3C, D2, D1);
@@ -94,13 +97,34 @@ const char index_html[] PROGMEM = R"rawliteral(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
     <script src="https://use.fontawesome.com/a836d2f02c.js"></script>
-    <script src="https://code.highcharts.com/highcharts.js"></script>
     <link rel="stylesheet" href="styles.css">
-    <title>Document</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+      integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+      integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <title>Smart Watch</title>
 </head>
 <body>
   <style>
-    html {
+    body {
   font-family: Arial;
   display: inline-block;
   margin: 0px auto;
@@ -120,49 +144,30 @@ const char index_html[] PROGMEM = R"rawliteral(
       vertical-align: middle;
       padding-bottom: 15px;
     }
-    .scanWifi{
-      color: #1e836c
-      width: 1 rem;
-      height: 1 rem;
+    .download-button {
+      margin: 5% 3% 5% 0;
     }
+    
+    
   </style>
   <h2>ESP8266 Smart Watch Server</h2>
-  <a href='/scanwifi'> 
-        <button class="scanWifi"> 
-            Scan Wifi
-        </button> 
-    </a> 
-  <a href='/sleepMax'> 
-      <button class="scanWifi"> 
-          Sensor Sleep
-      </button> 
-  </a> 
-  <a href='/wakeUpMax'> 
-        <button class="scanWifi"> 
-            Wake Up Sensor
-        </button> 
-    </a> 
-  <p>
-    <i class="fas fa-thermometer-half" style="color:#059e8a;"></i> 
-    <span class="dht-labels">Temperature</span> 
-    <span id="temperature">%TEMPERATURE%</span>
-    <sup class="units">&deg;C</sup>
-  </p>
-  <p>
-    <i class="fas fa-tint" style="color:#00add6;"></i> 
-    <span class="dht-labels">Humidity</span>
-    <span id="humidity">%HUMIDITY%</span>
-  </p>
+
+  <a class="btn btn-primary btn-lg download-button " href="/scanwifi" role="button">Scan Wifi</a>
+  <button class="btn btn-primary btn-lg download-button" onclick="macDinh()" type="button">Mặc định</button>
+  <button class="btn btn-primary btn-lg download-button" onclick="hrsp()" type="button">Hiển thị HR & SPO2</button>
+  
   <p>
     <i class="fas fa-heartbeat" style="color:#00add6;"></i> 
     <span class="dht-labels">Heart Rate</span>
     <span id="HR">%heartRate%</span>
   </p>
+  <div id="chart-hr" class="container"></div>
   <p>
     <i class="fas fa-fingerprint" style="color:#00add6;"></i> 
     <span class="dht-labels">SpO2</span>
     <span id="SPO2">%spo2%</span>
   </p>
+  <div id="chart-spo2" class="container"></div>
   <br>
   <h2><i class="fas fa-calendar-alt style="color:#00add6;"></i> <span>Calendar</span></h2>
   <p>
@@ -173,6 +178,16 @@ const char index_html[] PROGMEM = R"rawliteral(
   
 </body>
 <script>
+function macDinh() {
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("GET", "/macDinh", true);
+        xhttp.send();
+      }
+function hrsp() {
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("GET", "/hrsp", true);
+        xhttp.send();
+      }
 
 setInterval(function ( ) {
   var xhttp = new XMLHttpRequest();
@@ -218,107 +233,84 @@ setInterval(function ( ) {
   xhttp.send();
 }, 1000 ) ;
 
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("temperature").innerHTML = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/temperature", true);
-  xhttp.send();
-}, 10000 ) ;
-
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("humidity").innerHTML = this.responseText;
-    }
-  };
-  xhttp.open("GET", "/humidity", true);
-  xhttp.send();
-}, 10000 ) ;
-
 var chartT = new Highcharts.Chart({
-  chart:{ renderTo : 'chart-temperature' },
-  title: { text: 'BME280 Temperature' },
-  series: [{
-    showInLegend: false,
-    data: []
-  }],
-  plotOptions: {
-    line: { animation: false,
-      dataLabels: { enabled: true }
-    },
-    series: { color: '#059e8a' }
-  },
-  xAxis: { type: 'datetime',
-    dateTimeLabelFormats: { second: '%H:%M:%S' }
-  },
-  yAxis: {
-    title: { text: 'Temperature (Celsius)' }
-    //title: { text: 'Temperature (Fahrenheit)' }
-  },
-  credits: { enabled: false }
-});
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      var x = (new Date()).getTime(),
-          y = parseFloat(this.responseText);
-      //console.log(this.responseText);
-      if(chartT.series[0].data.length > 40) {
-        chartT.series[0].addPoint([x, y], true, true, true);
-      } else {
-        chartT.series[0].addPoint([x, y], true, false, true);
-      }
-    }
-  };
-  xhttp.open("GET", "/temperature", true);
-  xhttp.send();
-}, 10000 ) ;
+      chart: { renderTo: "chart-hr" },
+      title: { text: "MAX30102 heart-rate" },
+      series: [
+        {
+          showInLegend: false,
+          data: [],
+        },
+      ],
+      plotOptions: {
+        line: { animation: false, dataLabels: { enabled: true } },
+        series: { color: "#059e8a" },
+      },
+      xAxis: { type: "datetime", dateTimeLabelFormats: { second: "%H:%M:%S" } },
+      yAxis: {
+        title: { text: "bpm" },
+        //title: { text: 'Temperature (Fahrenheit)' }
+      },
+      credits: { enabled: false },
+    });
+    setInterval(function () {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
+          var d = new Date(),
+            x = d.getTime() - d.getTimezoneOffset() * 60000,
+            y = parseFloat(this.responseText);
+          //console.log(this.responseText);
+          if (chartT.series[0].data.length > 40) {
+            chartT.series[0].addPoint([x, y], true, true, true);
+          } else {
+            chartT.series[0].addPoint([x, y], true, false, true);
+          }
+        }
+      };
+      xhttp.open("GET", "/hr", true);
+      xhttp.send();
+    }, 5000);
 
-var chartH = new Highcharts.Chart({
-  chart:{ renderTo:'chart-humidity' },
-  title: { text: 'BME280 Humidity' },
-  series: [{
-    showInLegend: false,
-    data: []
-  }],
-  plotOptions: {
-    line: { animation: false,
-      dataLabels: { enabled: true }
-    }
-  },
-  xAxis: {
-    type: 'datetime',
-    dateTimeLabelFormats: { second: '%H:%M:%S' }
-  },
-  yAxis: {
-    title: { text: 'Humidity (%)' }
-  },
-  credits: { enabled: false }
-});
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      var x = (new Date()).getTime(),
-          y = parseFloat(this.responseText);
-      //console.log(this.responseText);
-      if(chartH.series[0].data.length > 40) {
-        chartH.series[0].addPoint([x, y], true, true, true);
-      } else {
-        chartH.series[0].addPoint([x, y], true, false, true);
-      }
-    }
-  };
-  xhttp.open("GET", "/humidity", true);
-  xhttp.send();
-}, 10000 ) ;
-
+    var chartH = new Highcharts.Chart({
+      chart: { renderTo: "chart-spo2" },
+      title: { text: "MAX30102 SPO2" },
+      series: [
+        {
+          showInLegend: false,
+          data: [],
+        },
+      ],
+      plotOptions: {
+        line: { animation: false, dataLabels: { enabled: true } },
+      },
+      xAxis: {
+        type: "datetime",
+        dateTimeLabelFormats: { second: "%H:%M:%S" },
+      },
+      yAxis: {
+        title: { text: "%" },
+      },
+      credits: { enabled: false },
+    });
+    setInterval(function () {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
+          var d = new Date(),
+            x = d.getTime() - d.getTimezoneOffset() * 60000,
+            y = parseFloat(this.responseText);
+          //console.log(this.responseText);
+          if (chartH.series[0].data.length > 40) {
+            chartH.series[0].addPoint([x, y], true, true, true);
+          } else {
+            chartH.series[0].addPoint([x, y], true, false, true);
+          }
+        }
+      };
+      xhttp.open("GET", "/spo2", true);
+      xhttp.send();
+    }, 5000);
 </script>
 </html>)rawliteral";
 
@@ -510,6 +502,22 @@ void setup()
     server.send(200, "text/plain", String(spo2).c_str());
   });
 
+  //Chuyen sang che do mac dinh
+  server.on("/macDinh", HTTP_GET, [] {
+    mode = 0;
+    Serial.print("Mode(web) = ");
+    Serial.println(mode);
+    server.send(200, "text/plain", "");
+  });
+
+  //Chuyen sang che do chi hien thi SPO2
+  server.on("/hrsp", HTTP_GET, [] {
+    mode = 1;
+    Serial.print("Mode(web) = ");
+    Serial.println(mode);
+    server.send(200, "text/plain", "");
+  });
+
   // todo Sleep and Wake Up Max30102
   // server.on("/sleepMax", HTTP_GET, [] {
   //   particleSensor.shutDown();
@@ -565,11 +573,23 @@ void loop()
                       //read the first 100 samples, and determine the signal range
                       // if (coWiFi == true)
                       // {
-  timeClient.update();
+
+  // todo test cap nhap thoi gian
+  // if (led <50000)
+  // {
+  //   if (currentMillis - previousMillisRTC >= intervalRTC)
+  //   {
+  //     previousMillisRTC=currentMillis;
+  //     particleSensor.shutDown();
+  //   }
+  // }
+  
+  
 
   // Cap nhap thoi gian
   if (currentMillis - previousMillisRTC >= intervalRTC)
   {
+    timeClient.update();
     previousMillisRTC = currentMillis;
     HMS = timeClient.getFormattedTime();
     Serial.println(HMS);
@@ -618,16 +638,16 @@ void loop()
     { //calculate heart rate and SpO2 after first 100 samples (first 4 seconds of samples)
       maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     }
-    j++;
+    // j++;
   }
 
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
   // while (1)
-  else if (j >= 100)
+  else if (j >= 100 && j < 200)
   {
     //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
     // for (byte i = 25; i < 100; i++)
-    if (k < 100)
+    if (k < 100 && k % 10 == 0)
     {
       redBuffer[k - 25] = redBuffer[k];
       irBuffer[k - 25] = irBuffer[k];
@@ -638,38 +658,43 @@ void loop()
     // for (byte i = 75; i < 100; i++)
     else if (k < 125)
     {
+
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check();                   //Check the sensor for new data
+      if (k % 10 == 0)
+      {
+        digitalWrite(readLED, !digitalRead(readLED)); //Blink onboard LED with every data read
 
-      digitalWrite(readLED, !digitalRead(readLED)); //Blink onboard LED with every data read
+        redBuffer[k - 25] = particleSensor.getRed();
+        irBuffer[k - 25] = particleSensor.getIR();
+        particleSensor.nextSample(); //We're finished with this sample so move to next sample
 
-      redBuffer[k - 25] = particleSensor.getRed();
-      irBuffer[k - 25] = particleSensor.getIR();
-      particleSensor.nextSample(); //We're finished with this sample so move to next sample
+        //send samples and calculation result to terminal program through UART
+        Serial.print(F("red="));
+        Serial.print(redBuffer[k], DEC);
+        Serial.print(F(", ir="));
+        Serial.print(irBuffer[k], DEC);
 
-      //send samples and calculation result to terminal program through UART
-      // Serial.print(F("red="));
-      // Serial.print(redBuffer[i], DEC);
-      // Serial.print(F(", ir="));
-      // Serial.print(irBuffer[i], DEC);
+        Serial.print(F(", HR="));
+        Serial.print(heartRate, DEC);
 
-      // Serial.print(F(", HR="));
-      // Serial.print(heartRate, DEC);
+        Serial.print(F(", HRvalid="));
+        Serial.print(validHeartRate, DEC);
 
-      // Serial.print(F(", HRvalid="));
-      // Serial.print(validHeartRate, DEC);
+        Serial.print(F(", SPO2="));
+        Serial.print(spo2, DEC);
 
-      // Serial.print(F(", SPO2="));
-      // Serial.print(spo2, DEC);
-
-      // Serial.print(F(", SPO2Valid="));
-      // Serial.println(validSPO2, DEC);
+        Serial.print(F(", SPO2Valid="));
+        Serial.println(validSPO2, DEC);
+      }
+    }
+    else if (k >= 125)
+    { //After gathering 25 new samples recalculate HR and SP02
+      maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     }
 
-    //After gathering 25 new samples recalculate HR and SP02
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     k++;
-    j++;
+    // j++;
   }
 
   else if (j >= 200)
@@ -677,30 +702,58 @@ void loop()
     j = 100;
     k = 25;
   }
+  j++;
+
+  // if (spo2 == -999)
+  // {
+  //   String(spo2) = "OL";
+  // }
 
   // hien thi oled
   // todo display.drawString(x (hang ngang), y(hang doc), "Temp: ");
+  if (mode == 0)
+  {
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_10);
+    // display.drawString(0, 0, "Temp: ");
+    display.drawString(0, 0, "HR: ");
+    display.setFont(ArialMT_Plain_10);
+    // display.drawString(40, 0, String(t));
+    display.drawString(40, 0, String(heartRate));
+    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(100, 0, "SpO2: ");
+    display.setFont(ArialMT_Plain_10);
+    // display.drawString(128, 0, String(h));
+    display.drawString(128, 0, String(spo2));
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(64, 20, HMS);
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(64, 35, currentDate);
+  }
+
+  // Chi hien thi nhip tim
+  else if (mode == 1)
+  {
+
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(0, 0, "HR: ");
+    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(128, 0, String(heartRate) + "bpm");
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(0, 28, "SpO2: ");
+    display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(128, 28, String(spo2) + "%");
+  }
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_10);
-  // display.drawString(0, 0, "Temp: ");
-  display.drawString(0, 0, "HR: ");
+  display.drawString(0, 50, "IP: ");
   display.setFont(ArialMT_Plain_10);
-  // display.drawString(40, 0, String(t));
-  display.drawString(40, 0, String(heartRate));
-  display.setTextAlignment(TEXT_ALIGN_RIGHT);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(100, 0, "SpO2: ");
-  display.setFont(ArialMT_Plain_10);
-  // display.drawString(128, 0, String(h));
-  display.drawString(128, 0, String(spo2));
-  display.setTextAlignment(TEXT_ALIGN_CENTER);
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(64, 20, HMS);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(64, 35, currentDate);
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 45, "IP: ");
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(30, 45, WiFi.localIP().toString());
+  display.drawString(30, 50, WiFi.localIP().toString());
+  
 }

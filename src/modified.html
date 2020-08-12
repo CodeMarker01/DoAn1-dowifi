@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+    <script src="https://use.fontawesome.com/a836d2f02c.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+      integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+      integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js"
+      integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"
+      integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6"
+      crossorigin="anonymous"
+    ></script>
+    <title>Smart Watch</title>
+</head>
+<body>
+  <style>
+    body {
+  font-family: Arial;
+  display: inline-block;
+  margin: 0px auto;
+  text-align: center;
+  }
+    h2 {  
+      font-size: 3rem;
+    }
+    p {
+      font-size: 3rem;
+    }
+    .units {
+      font-size: 1.2rem;
+    }
+    .dht-labels {
+      font-size: 1.5rem;
+      vertical-align: middle;
+      padding-bottom: 15px;
+    }
+    .scanWifi {
+        
+    }
+    
+  </style>
+  <h2>ESP8266 Smart Watch Server</h2>
+  <a class="btn btn-primary btn-lg" href="/scanwifi" role="button">Scan Wifi</a>
+  
+  <p>
+    <i class="fas fa-heartbeat" style="color:#00add6;"></i> 
+    <span class="dht-labels">Heart Rate</span>
+    <span id="HR">%heartRate%</span>
+  </p>
+  <p>
+    <i class="fas fa-fingerprint" style="color:#00add6;"></i> 
+    <span class="dht-labels">SpO2</span>
+    <span id="SPO2">%spo2%</span>
+  </p>
+  <br>
+  <h2><i class="fas fa-calendar-alt style="color:#00add6;"></i> <span>Calendar</span></h2>
+  <p>
+    <span id="timehms">%HMS%</span>
+    </br>
+    <span id="timedmy" class="dht-labels">%currentDate%</span>
+  </p>
+  
+</body>
+<script>
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("timehms").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/hms", true);
+  xhttp.send();
+}, 500 ) ;
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("timedmy").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/dmy", true);
+  xhttp.send();
+}, 10000 ) ;
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("HR").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/hr", true);
+  xhttp.send();
+}, 1000 ) ;
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("SPO2").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/spo2", true);
+  xhttp.send();
+}, 1000 ) ;
+</script>
+</html>
