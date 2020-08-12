@@ -431,7 +431,7 @@ void setup()
   });
 
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP("dang quang", "19216812");
+  WiFi.softAP("ESPWiFi", "19216812");
 
   // todo do wifi
   String id = "";
