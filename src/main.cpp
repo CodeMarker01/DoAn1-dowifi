@@ -1,6 +1,8 @@
 /*********
-  Rui Santos
-  Complete project details at https://randomnerdtutorials.com/esp8266-dht11dht22-temperature-and-humidity-web-server-with-arduino-ide/
+  Do an 1: Dong ho do nhip tim va oxy trong mau
+  Thanh vien: Tran Dang Quang
+              Nguyen Thanh Nhan
+  GVHD : TS. Do Duy Tan 
 *********/
 
 // Import required libraries
